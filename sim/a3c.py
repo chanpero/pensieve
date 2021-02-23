@@ -1,7 +1,6 @@
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tflearn
-
 
 GAMMA = 0.99
 A_DIM = 6
@@ -15,6 +14,7 @@ class ActorNetwork(object):
     Input to the network is the state, output is the distribution
     of all actions.
     """
+
     def __init__(self, sess, state_dim, action_dim, learning_rate):
         self.sess = sess
         self.s_dim = state_dim
@@ -25,8 +25,7 @@ class ActorNetwork(object):
         self.inputs, self.out = self.create_actor_network()
 
         # Get all network parameters
-        self.network_params = \
-            tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actor')
+        self.network_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actor')
 
         # Set all network parameters
         self.input_network_params = []
@@ -44,19 +43,18 @@ class ActorNetwork(object):
         self.act_grad_weights = tf.placeholder(tf.float32, [None, 1])
 
         # Compute the objective (log action_vector and entropy)
-        self.obj = tf.reduce_sum(tf.multiply(
-                       tf.log(tf.reduce_sum(tf.multiply(self.out, self.acts),
-                                            reduction_indices=1, keep_dims=True)),
-                       -self.act_grad_weights)) \
-                   + ENTROPY_WEIGHT * tf.reduce_sum(tf.multiply(self.out,
-                                                           tf.log(self.out + ENTROPY_EPS)))
+        self.obj = tf.reduce_sum(input_tensor=tf.multiply(
+            tf.log(tf.reduce_sum(input_tensor=tf.multiply(self.out, self.acts),
+                                           axis=1, keepdims=True)),
+            -self.act_grad_weights)) \
+                   + ENTROPY_WEIGHT * tf.reduce_sum(input_tensor=tf.multiply(self.out,
+                                                                tf.log(self.out + ENTROPY_EPS)))
 
         # Combine the gradients here
-        self.actor_gradients = tf.gradients(self.obj, self.network_params)
+        self.actor_gradients = tf.gradients(ys=self.obj, xs=self.network_params)
 
         # Optimization Op
-        self.optimize = tf.train.RMSPropOptimizer(self.lr_rate).\
-            apply_gradients(zip(self.actor_gradients, self.network_params))
+        self.optimize = tf.train.RMSPropOptimizer(self.lr_rate).apply_gradients(list(zip(self.actor_gradients, self.network_params)))
 
     def create_actor_network(self):
         with tf.variable_scope('actor'):
@@ -119,6 +117,7 @@ class CriticNetwork(object):
     Input to the network is the state and action, output is V(s).
     On policy: the action must be obtained from the output of the Actor network.
     """
+
     def __init__(self, sess, state_dim, learning_rate):
         self.sess = sess
         self.s_dim = state_dim
@@ -150,11 +149,11 @@ class CriticNetwork(object):
         self.loss = tflearn.mean_square(self.td_target, self.out)
 
         # Compute critic gradient
-        self.critic_gradients = tf.gradients(self.loss, self.network_params)
+        self.critic_gradients = tf.gradients(ys=self.loss, xs=self.network_params)
 
         # Optimization Op
-        self.optimize = tf.train.RMSPropOptimizer(self.lr_rate).\
-            apply_gradients(zip(self.critic_gradients, self.network_params))
+        self.optimize = tf.train.RMSPropOptimizer(self.lr_rate). \
+            apply_gradients(list(zip(self.critic_gradients, self.network_params)))
 
     def create_critic_network(self):
         with tf.variable_scope('critic'):
@@ -234,7 +233,7 @@ def compute_gradients(s_batch, a_batch, r_batch, terminal, actor, critic):
     else:
         R_batch[-1, 0] = v_batch[-1, 0]  # boot strap from last state
 
-    for t in reversed(xrange(ba_size - 1)):
+    for t in reversed(range(ba_size - 1)):
         R_batch[t, 0] = r_batch[t] + GAMMA * R_batch[t + 1, 0]
 
     td_batch = R_batch - v_batch
@@ -252,8 +251,8 @@ def discount(x, gamma):
     """
     out = np.zeros(len(x))
     out[-1] = x[-1]
-    for i in reversed(xrange(len(x)-1)):
-        out[i] = x[i] + gamma*out[i+1]
+    for i in reversed(range(len(x) - 1)):
+        out[i] = x[i] + gamma * out[i + 1]
     assert x.ndim >= 1
     # More efficient version:
     # scipy.signal.lfilter([1],[1,-gamma],x[::-1], axis=0)[::-1]
@@ -266,7 +265,7 @@ def compute_entropy(x):
     H(x) = - sum( p * log(p))
     """
     H = 0.0
-    for i in xrange(len(x)):
+    for i in range(len(x)):
         if 0 < x[i] < 1:
             H -= x[i] * np.log(x[i])
     return H
@@ -284,3 +283,71 @@ def build_summaries():
     summary_ops = tf.summary.merge_all()
 
     return summary_ops, summary_vars
+
+
+if __name__ == '__main__':
+    import os
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  # or any {'0', '1', '2'}
+
+    with tf.Session() as sess:
+        actor = ActorNetwork(sess, state_dim=[6, 8], action_dim=6, learning_rate=0.0001)
+        critic = CriticNetwork(sess, state_dim=[6, 8], learning_rate=0.001)
+        summary_ops, summary_vars = build_summaries()
+
+        print('------------------------------')
+
+        sess.run(tf.global_variables_initializer())
+        writer = tf.summary.FileWriter('./results', sess.graph)  # training monitor
+        saver = tf.train.Saver()  # save neural net parameters
+
+        # restore neural net parameters
+        nn_model = None
+        if nn_model is not None:  # nn_model is the path to file
+            saver.restore(sess, nn_model)
+            print("Model restored.")
+
+        epoch = 0
+
+        # synchronize the network parameters of work agent
+        actor_net_params = actor.get_network_params()
+        critic_net_params = critic.get_network_params()
+
+        net_params_queues = []
+        exp_queues = []
+        import multiprocessing as mp
+        for i in range(16):
+            net_params_queues.append(mp.Queue(1))
+            exp_queues.append(mp.Queue(1))
+
+        for i in range(16):
+            net_params_queues[i].put([actor_net_params, critic_net_params])
+
+        total_batch_len = 0.0
+        total_reward = 0.0
+        total_td_loss = 0.0
+        total_entropy = 0.0
+        total_agents = 0.0
+        actor_gradient_batch = []
+        critic_gradient_batch = []
+
+        for i in range(16):
+            s_batch, a_batch, r_batch, terminal, info = exp_queues[i].get()
+
+            actor_gradient, critic_gradient, td_batch = \
+                compute_gradients(
+                    s_batch=np.stack(s_batch, axis=0),
+                    a_batch=np.vstack(a_batch),
+                    r_batch=np.vstack(r_batch),
+                    terminal=terminal, actor=actor, critic=critic)
+            print('++++++++++++++++++++++++++++')
+            actor_gradient_batch.append(actor_gradient)
+            critic_gradient_batch.append(critic_gradient)
+
+            print('actor_gradient_batch: ' + str(actor_gradient_batch))
+            print('critic_gradient_batch: ' + str(critic_gradient_batch))
+
+            total_reward += np.sum(r_batch)
+            total_td_loss += np.sum(td_batch)
+            total_batch_len += len(r_batch)
+            total_agents += 1.0
+            total_entropy += np.sum(info['entropy'])

@@ -54,9 +54,9 @@ class Tabular_Q(object):
             # initialize the q table
             for bw in np.linspace(BW_MIN, BW_MAX, (BW_MAX - BW_MIN) / D_BW + 1):
                 for bf in np.linspace(BF_MIN, BF_MAX, (BF_MAX - BF_MIN) / D_BF + 1):
-                    for br in xrange(BR_LV):
-                        for c in xrange(N_CHUNK):
-                            for a in xrange(BR_LV):
+                    for br in range(BR_LV):
+                        for c in range(N_CHUNK):
+                            for a in range(BR_LV):
                                 self.q_table[(bw, bf, br, c, a)] = 0.0
 
         self.exp_rate = 1.0
@@ -72,7 +72,7 @@ class Tabular_Q(object):
         else:
             max_q = - np.inf
             act = -1
-            for a in xrange(BR_LV):
+            for a in range(BR_LV):
                 q = self.q_table[(bw, bf, br, c, a)]
                 if q > max_q:
                     act = a
@@ -99,7 +99,7 @@ class Tabular_Q(object):
             max_next_q = 0
         else:
             max_next_q = - np.inf        
-            for a in xrange(BR_LV):
+            for a in range(BR_LV):
                 q = self.q_table[(n_bw, n_bf, n_br, n_c, a)]
                 if q > max_next_q:
                     max_next_q = q
@@ -152,13 +152,13 @@ def testing(tabular_q, epoch):
 
         last_bit_rate = bit_rate
 
-        log_file.write(str(time_stamp / M_IN_K) + '\t' +
+        log_file.write((str(time_stamp / M_IN_K) + '\t' +
                            str(VIDEO_BIT_RATE[bit_rate]) + '\t' +
                            str(buffer_size) + '\t' +
                            str(rebuf) + '\t' +
                            str(video_chunk_size) + '\t' +
                            str(delay) + '\t' +
-                           str(reward) + '\n')
+                           str(reward) + '\n').encode())
         log_file.flush()
 
         bw = float(video_chunk_size) / float(delay) / M_IN_K * BITS_IN_BYTE # Mbit/sec
@@ -171,7 +171,7 @@ def testing(tabular_q, epoch):
         bit_rate = tabular_q.get_q_action(state, deterministic=True)
 
         if end_of_video:
-            log_file.write('\n')
+            log_file.write(('\n').encode)
             log_file.close()
 
             last_bit_rate = DEFAULT_QUALITY
@@ -211,13 +211,13 @@ def testing(tabular_q, epoch):
         rewards_95per = np.percentile(rewards, 95)
         rewards_max = np.max(rewards)
 
-        log_file.write(str(epoch) + '\t' +
+        log_file.write((str(epoch) + '\t' +
                        str(rewards_min) + '\t' +
                        str(rewards_5per) + '\t' +
                        str(rewards_mean) + '\t' +
                        str(rewards_median) + '\t' +
                        str(rewards_95per) + '\t' +
-                       str(rewards_max) + '\n')
+                       str(rewards_max) + '\n').encode())
         log_file.flush()
 
 

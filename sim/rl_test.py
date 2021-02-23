@@ -1,19 +1,19 @@
 import os
 import sys
-os.environ['CUDA_VISIBLE_DEVICES']=''
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import load_trace
 import a3c
 import fixed_env as env
 
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
-S_INFO = 6  # bit_rate, buffer_size, next_chunk_size, bandwidth_measurement(throughput and time), chunk_til_video_end
+S_INFO = 6  # state[t] contains: bit_rate, buffer_size, next_chunk_size, bandwidth_measurement(throughput and time), chunk_til_video_end
 S_LEN = 8  # take how many frames in the past
 A_DIM = 6
 ACTOR_LR_RATE = 0.0001
 CRITIC_LR_RATE = 0.001
-VIDEO_BIT_RATE = [300,750,1200,1850,2850,4300]  # Kbps
+VIDEO_BIT_RATE = [300, 750, 1200, 1850, 2850, 4300]  # Kbps
 BUFFER_NORM_FACTOR = 10.0
 CHUNK_TIL_VIDEO_END_CAP = 48.0
 M_IN_K = 1000.0
@@ -25,11 +25,11 @@ RAND_RANGE = 1000
 LOG_FILE = './test_results/log_sim_rl'
 TEST_TRACES = './cooked_test_traces/'
 # log in format of time_stamp bit_rate buffer_size rebuffer_time chunk_size download_time reward
-NN_MODEL = sys.argv[1]
+# NN_MODEL = sys.argv[1]
+NN_MODEL = './results/nn_model_ep_14200.ckpt'
 
 
 def main():
-
     np.random.seed(RANDOM_SEED)
 
     assert len(VIDEO_BIT_RATE) == A_DIM
@@ -97,13 +97,13 @@ def main():
             last_bit_rate = bit_rate
 
             # log time_stamp, bit_rate, buffer_size, reward
-            log_file.write(str(time_stamp / M_IN_K) + '\t' +
-                           str(VIDEO_BIT_RATE[bit_rate]) + '\t' +
-                           str(buffer_size) + '\t' +
-                           str(rebuf) + '\t' +
-                           str(video_chunk_size) + '\t' +
-                           str(delay) + '\t' +
-                           str(reward) + '\n')
+            log_file.write((str(time_stamp / M_IN_K) + '\t' +
+                            str(VIDEO_BIT_RATE[bit_rate]) + '\t' +
+                            str(buffer_size) + '\t' +
+                            str(rebuf) + '\t' +
+                            str(video_chunk_size) + '\t' +
+                            str(delay) + '\t' +
+                            str(reward) + '\n').encode())
             log_file.flush()
 
             # retrieve previous state
@@ -134,7 +134,7 @@ def main():
             entropy_record.append(a3c.compute_entropy(action_prob[0]))
 
             if end_of_video:
-                log_file.write('\n')
+                log_file.write(('\n').encode())
                 log_file.close()
 
                 last_bit_rate = DEFAULT_QUALITY

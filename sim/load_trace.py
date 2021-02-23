@@ -24,3 +24,7 @@ def load_trace(cooked_trace_folder=COOKED_TRACE_FOLDER):
         all_file_names.append(cooked_file)
 
     return all_cooked_time, all_cooked_bw, all_file_names
+
+
+if __name__ == '__main__':
+    load_trace()

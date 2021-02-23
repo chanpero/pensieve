@@ -9,7 +9,7 @@ BITRATE_LEVELS = 6
 TOTAL_VIDEO_CHUNCK = 48
 BUFFER_THRESH = 60.0 * MILLISECONDS_IN_SECOND  # millisec, max buffer limit
 DRAIN_BUFFER_SLEEP_TIME = 500.0  # millisec
-PACKET_PAYLOAD_PORTION = 0.95
+PACKET_PAYLOAD_PORTION = 0.95 # a portion that used to load chunk in network(with some headers)
 LINK_RTT = 80  # millisec
 PACKET_SIZE = 1500  # bytes
 VIDEO_SIZE_FILE = './video_size_'
@@ -38,8 +38,9 @@ class Environment:
         self.mahimahi_ptr = 1
         self.last_mahimahi_time = self.cooked_time[self.mahimahi_ptr - 1]
 
+        # self.video_size = [6][49]
         self.video_size = {}  # in bytes
-        for bitrate in xrange(BITRATE_LEVELS):
+        for bitrate in range(BITRATE_LEVELS):
             self.video_size[bitrate] = []
             with open(VIDEO_SIZE_FILE + str(bitrate)) as f:
                 for line in f:
@@ -53,10 +54,12 @@ class Environment:
         video_chunk_size = self.video_size[quality][self.video_chunk_counter]
 
         # use the delivery opportunity in mahimahi
+        # delay: time needed to download a chunk
         delay = 0.0  # in ms
         video_chunk_counter_sent = 0  # in bytes
 
         while True:  # download video chunk over mahimahi
+            # throughput: bits/s
             throughput = self.cooked_bw[self.mahimahi_ptr] \
                          * B_IN_MB / BITS_IN_BYTE
             duration = self.cooked_time[self.mahimahi_ptr] \
@@ -150,7 +153,7 @@ class Environment:
             self.last_mahimahi_time = self.cooked_time[self.mahimahi_ptr - 1]
 
         next_video_chunk_sizes = []
-        for i in xrange(BITRATE_LEVELS):
+        for i in range(BITRATE_LEVELS):
             next_video_chunk_sizes.append(self.video_size[i][self.video_chunk_counter])
 
         return delay, \
