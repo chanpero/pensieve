@@ -22,7 +22,7 @@
 </br>
 
 ## **2.3 multi_agent.py**
-### main():
+## main():
 * 进程间通信队列：
   * net_params_queues = [16 * mp.Queue(1)]
   * exp_queues = [16 * mp.Queue(1)]
@@ -65,23 +65,62 @@
 </br>
 **********************************************************
 
+## agent(agent_id, time, bw, net_params_queue, exp_queue):
+* 初始化随机net_env
+* tf.Session():
+  * 创建A3C网络，获取设置net参数
+  * 初始化bit_rate, action_vec, s|a|r_batch, entropy_record, time_stamp
+  * while True:
+    + **net_env.get_video_chunk(bitrate)** 获取模拟下载某一个chunk的数据
+    + 更新time_stamp, 计算reward[linear/log/HD]，加入r_batch
+    + 更新state
+    + 将state传入actor.predict预测action_prob (softmax结果)
+    + action_cumsum：action概率的累积分布
+    + bit_rate 返回能够满足一个随机概率的最小bitrate
+    + 计算entropy并记录
+    + 记录日志： time_stamp(s), video_bitrate， buf_size(s), rebuf(s), chunk_size(byte), delay(ms), reward
+    + 每100个chunk或者一个视频模拟结束，将s|a|r_batch, end_of_video, entropy_record传入exp_queue
+    + 更新net_params
+    + 清空s|a|r_batch, entropy_record
+    + 如果一个视频结束，重置bitrate, action_vec, s|a_batch, 否则添加state, action 
+
+
+
+
+
+
+**********************************************************
 ## rl_test.py:
 + load_traces
-+ net_env = Environment(time, bw)
++ net_env = Fixed_Environment(time, bw) 固定质量1
 + 初始化log_file
 + tf.Session():
   + 创建A3C网络，恢复NN_Model,初始化一系列参数
   + while True:
     + **net_env.get_video_chunk(bitrate)** 获取模拟下载某一个chunk的数据
+    + 更新time_stamp, 计算reward，加入r_batch
+    + 记录日志： time_stamp(s), video_bitrate， buf_size(s), rebuf(s), chunk_size(byte), delay(ms), reward
+    + 存入state中，state是过去8 chunk的模拟数据
+    + 将state传入actor.predict预测action_prob (softmax结果)
+    + action_cumsum：action概率的累积分布
+    + bit_rate 返回能够满足一个随机概率的最小bitrate
+    + s_batch添加state记录，计算entropy并记录
+    + 一个trace_file或一个视频模拟结束后，清空s,a,r_batch，切换下一trace_file
 
 
 ************************************************
 
-## fixed_env.py:
-### Environment
+## fixed_env.py | env.py(随机):
 + __init__: 初始化模拟网络环境
-+ get_video_chunk: 
-  + 根据timestamp和bw推算下载一个chunk所需时间: delay
++ get_video_chunk: 根据timestamp和bw推算，默认初始质量为1: 
+  + delay: 下载下一个chunk所需时间
+  + sleep_time: buffer超过threshold时需要暂停的时间
+  + buffer_size: seconds
+  + rebuf: 暂停缓冲时间
+  + video_chunk_size
+  + next_video_chunk_sizes: [6]对应各个质量的下一chunk大小
+  + end_of_video: bool 是否结束
+  + video_chunk_remain: 剩余chunk块数
 
 ***********************************************
 
@@ -95,4 +134,5 @@
     + + create_critic_network 创建网络 conv_1d、fully_conncted、relu、linear...
     + + 设置optimizer、td_loss、gradient
 + compute_gradients: 计算actor_gradient,critic_gradient,td_batch
++ compute_entropy(action_prob): 计算actor.predict结果的entropy
 + build_summary: [创建scalar，用于tensorboard可视化]

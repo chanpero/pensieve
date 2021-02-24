@@ -7,7 +7,7 @@ import env
 import a3c
 import load_trace
 
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
+# os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 S_INFO = 6  # bit_rate, buffer_size, next_chunk_size, bandwidth_measurement(throughput and time), chunk_til_video_end
 S_LEN = 8  # take how many frames in the past
@@ -31,7 +31,10 @@ SUMMARY_DIR = './results'
 LOG_FILE = './results/log'
 TEST_LOG_FOLDER = './test_results/'
 TRAIN_TRACES = './cooked_traces/'
-NN_MODEL = './results/nn_model_ep_400.ckpt'
+# NN_MODEL = './results/pretrain_linear_reward.ckpt'
+NN_MODEL = None
+
+
 # NN_MODEL = None
 
 
@@ -67,12 +70,12 @@ def testing(epoch, nn_model, log_file):
     rewards_max = np.max(rewards)
 
     log_file.write((str(epoch) + '\t' +
-                   str(rewards_min) + '\t' +
-                   str(rewards_5per) + '\t' +
-                   str(rewards_mean) + '\t' +
-                   str(rewards_median) + '\t' +
-                   str(rewards_95per) + '\t' +
-                   str(rewards_max) + '\n').encode())
+                    str(rewards_min) + '\t' +
+                    str(rewards_5per) + '\t' +
+                    str(rewards_mean) + '\t' +
+                    str(rewards_median) + '\t' +
+                    str(rewards_95per) + '\t' +
+                    str(rewards_max) + '\n').encode())
     log_file.flush()
 
 
@@ -152,7 +155,6 @@ def central_agent(net_params_queues, exp_queues):
                 total_agents += 1.0
                 total_entropy += np.sum(info['entropy'])
 
-
             # compute aggregated gradient
             assert NUM_AGENTS == len(actor_gradient_batch)
             assert len(actor_gradient_batch) == len(critic_gradient_batch)
@@ -230,10 +232,8 @@ def agent(agent_id, all_cooked_time, all_cooked_bw, net_params_queue, exp_queue)
 
             # the action is from the last decision
             # this is to make the framework similar to the real
-            delay, sleep_time, buffer_size, rebuf, \
-            video_chunk_size, next_video_chunk_sizes, \
-            end_of_video, video_chunk_remain = \
-                net_env.get_video_chunk(bit_rate)
+            delay, sleep_time, buffer_size, rebuf, video_chunk_size, \
+            next_video_chunk_sizes, end_of_video, video_chunk_remain = net_env.get_video_chunk(bit_rate)
 
             time_stamp += delay  # in ms
             time_stamp += sleep_time  # in ms
@@ -298,7 +298,7 @@ def agent(agent_id, all_cooked_time, all_cooked_bw, net_params_queue, exp_queue)
                             str(reward) + '\n').encode())
             log_file.flush()
 
-            # report experience to the coordinator
+            # report experience to the coordinator, 100 chunks per batch
             if len(r_batch) >= TRAIN_SEQ_LEN or end_of_video:
                 exp_queue.put([s_batch[1:],  # ignore the first chuck
                                a_batch[1:],  # since we don't have the

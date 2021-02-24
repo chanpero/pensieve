@@ -57,7 +57,8 @@ class Environment:
         delay = 0.0  # in ms
         video_chunk_counter_sent = 0  # in bytes
 
-        while True:  # download video chunk over mahimahi
+        # data used to download a video chunk over mahimahi studied by traces
+        while True:
             throughput = self.cooked_bw[self.mahimahi_ptr] \
                          * B_IN_MB / BITS_IN_BYTE
             duration = self.cooked_time[self.mahimahi_ptr] \

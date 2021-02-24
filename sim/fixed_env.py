@@ -27,14 +27,12 @@ class Environment:
         self.video_chunk_counter = 0
         self.buffer_size = 0
 
-        # pick a random trace file
+        # pick a trace file
         self.trace_idx = 0
         self.cooked_time = self.all_cooked_time[self.trace_idx]
         self.cooked_bw = self.all_cooked_bw[self.trace_idx]
 
         self.mahimahi_start_ptr = 1
-        # randomize the start point of the trace
-        # note: trace file starts with time 0
         self.mahimahi_ptr = 1
         self.last_mahimahi_time = self.cooked_time[self.mahimahi_ptr - 1]
 
@@ -58,7 +56,8 @@ class Environment:
         delay = 0.0  # in ms
         video_chunk_counter_sent = 0  # in bytes
 
-        while True:  # download video chunk over mahimahi
+        # simulate download one video chunk over mahimahi
+        while True:
             # throughput: bits/s
             throughput = self.cooked_bw[self.mahimahi_ptr] \
                          * B_IN_MB / BITS_IN_BYTE
@@ -98,7 +97,7 @@ class Environment:
         # add in the new chunk
         self.buffer_size += VIDEO_CHUNCK_LEN
 
-        # sleep if buffer gets too large
+        # sleep if buffer exceeds BUFFER_THRESH
         sleep_time = 0
         if self.buffer_size > BUFFER_THRESH:
             # exceed the buffer limit
@@ -156,11 +155,6 @@ class Environment:
         for i in range(BITRATE_LEVELS):
             next_video_chunk_sizes.append(self.video_size[i][self.video_chunk_counter])
 
-        return delay, \
-            sleep_time, \
-            return_buffer_size / MILLISECONDS_IN_SECOND, \
-            rebuf / MILLISECONDS_IN_SECOND, \
-            video_chunk_size, \
-            next_video_chunk_sizes, \
-            end_of_video, \
-            video_chunk_remain
+        return delay, sleep_time, return_buffer_size / MILLISECONDS_IN_SECOND, \
+               rebuf / MILLISECONDS_IN_SECOND, video_chunk_size, \
+               next_video_chunk_sizes, end_of_video, video_chunk_remain
